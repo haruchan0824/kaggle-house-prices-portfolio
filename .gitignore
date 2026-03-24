@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+
+# Data
+data/
+*.csv
+
+# Notebooks checkpoint
+.ipynb_checkpoints/
+
+# Outputs
+outputs/
+
+# OS
+.DS_Store
