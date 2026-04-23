@@ -20,3 +20,12 @@ def save_feature_importance(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     feature_importance.to_csv(output_path, index=False)
+
+
+def save_model_comparison(
+    comparison_df: pd.DataFrame,
+    output_path: str | Path = "outputs/model_comparison.csv",
+) -> None:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    comparison_df.to_csv(output_path, index=False)

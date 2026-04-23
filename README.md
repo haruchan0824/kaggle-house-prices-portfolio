@@ -1,166 +1,143 @@
-# Kaggle House Prices — Portfolio Baseline
+# Kaggle House Prices — Portfolio Pipeline (Entry-Level ML Engineer)
 
-A clean, interview-ready machine learning project based on the [Kaggle House Prices competition](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques).
+A clean, interview-friendly tabular ML project based on the [Kaggle House Prices competition](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques).
+
+> **Project intent:** demonstrate reproducibility, explainability, and iterative improvement — not leaderboard chasing.
 
 ## Overview
 
-This repository demonstrates a **simple, production-style tabular ML workflow** using LightGBM.
-The focus is not leaderboard optimization; it is code quality, reproducibility, and clear ML fundamentals.
+This repository shows a practical regression workflow for structured data:
 
-## Goal
+- clear preprocessing
+- modular training code
+- 5-fold cross-validation
+- artifact generation for reproducibility
 
-Build a baseline regression pipeline that is:
+It is designed to be easy to explain in interviews for entry-level AI/ML/Data Engineer roles.
 
-- Easy to read and explain in interviews
-- Modular and maintainable
-- Reproducible from raw CSV files to Kaggle submission
+## Problem
 
-## Dataset
+- **Task:** predict `SalePrice` from tabular features
+- **Target transform:** `log1p(SalePrice)` during training, `expm1` at prediction output
+- **Validation metric:** RMSE on log-transformed target
 
-Competition: **House Prices: Advanced Regression Techniques**
+## Iterative Project Flow
 
-Expected local files:
+This project is structured as an iterative pipeline:
 
-- `data/raw/train.csv`
-- `data/raw/test.csv`
+1. **Baseline:** LightGBM with simple, robust preprocessing
+2. **Feature engineering:** add small domain-driven features that are easy to explain
+3. **Lightweight tuning:** limited Optuna search for key hyperparameters only
+4. **Simple ensemble:** LightGBM + CatBoost 50/50 average (no stacking)
 
-Target variable:
+Important: more complexity did **not** automatically produce the best model in this project.
 
-- `SalePrice`
+## Models
 
-ID column:
+- LightGBM Regressor (`LGBMRegressor`)
+- CatBoost Regressor (`CatBoostRegressor`)
+- Simple average ensemble (`0.5 * LightGBM + 0.5 * CatBoost`)
 
-- `Id`
+## Preprocessing
 
-## Method
+- Numeric: median imputation
+- Categorical: fill missing with `"Missing"`
+- Encoding: one-hot encoding (`handle_unknown="ignore"`)
+- Target: `log1p(SalePrice)`
 
-### Model
+## Added Domain Features
 
-- **LightGBM Regressor** (`LGBMRegressor`)
-- **CatBoost Regressor** (`CatBoostRegressor`)
-- Final prediction: simple average of both model predictions
+- `TotalSF = TotalBsmtSF + 1stFlrSF + 2ndFlrSF`
+- `HouseAge = YrSold - YearBuilt`
+- `RemodAge = YrSold - YearRemodAdd`
+- `TotalBath = FullBath + 0.5 * HalfBath + BsmtFullBath + 0.5 * BsmtHalfBath`
+- `HasGarage = (GarageArea > 0)`
+- `HasBsmt = (TotalBsmtSF > 0)`
+- `HasFireplace = (Fireplaces > 0)`
+- `OverallQual_x_GrLivArea = OverallQual * GrLivArea`
 
-### Preprocessing
+These features were chosen because they are intuitive (size, age, remodeling, amenities, quality-area interaction) and easy to justify in interviews.
 
-- `log1p` transformation on target (`SalePrice`)
-- Numeric columns: median imputation
-- Categorical columns: fill missing values with `"Missing"`
-- One-hot encoding for categorical features (`handle_unknown="ignore"`)
-- Simple domain-driven features (added before encoding):
-  - `TotalSF = TotalBsmtSF + 1stFlrSF + 2ndFlrSF`
-  - `HouseAge = YrSold - YearBuilt`
-  - `RemodAge = YrSold - YearRemodAdd`
-  - `TotalBath = FullBath + 0.5 * HalfBath + BsmtFullBath + 0.5 * BsmtHalfBath`
-  - `HasGarage`, `HasBsmt`, `HasFireplace` (binary flags)
-  - `OverallQual_x_GrLivArea = OverallQual * GrLivArea`
+## Results (5-fold CV)
 
-Why these features are useful:
+| Model | Mean RMSE | Std RMSE |
+|---|---:|---:|
+| LightGBM | 0.13323640336408846 | 0.01783933807588219 |
+| CatBoost | **0.12380264917734725** | 0.017687264357621062 |
+| Ensemble (LGBM + CatBoost average) | 0.12537854076497493 | 0.018206999267681857 |
 
-- They capture intuitive housing signals (size, age, bathroom capacity, key amenities, and quality-size interaction).
-- They are simple to explain in interviews and easy to reproduce.
-- They improve feature expressiveness without over-engineering.
+### Interpretation
 
-### Validation
+- **CatBoost was the best-performing model** in this run.
+- The simple ensemble improved over **LightGBM alone**, but **did not beat CatBoost**.
+- This is a useful portfolio lesson: a more complex setup is not always the top performer.
 
-- 5-fold cross-validation (`KFold`, shuffled, fixed random state)
-- Metric tracked in this project: RMSE on log-transformed target
+## Feature Importance Note
 
-### Simple ensemble rationale
+Engineered features such as `OverallQual_x_GrLivArea` and `TotalSF` appear useful in importance analysis.
 
-- We train two different tree-based models (LightGBM and CatBoost) and average predictions.
-- Different models can make different errors on the same sample, so averaging can reduce variance and improve robustness.
-- We intentionally use a plain 50/50 average to keep the method transparent and easy to explain in interviews.
-- We intentionally do **not** use stacking or complex blending optimization in this portfolio project.
+At the same time, high importance for **`Id`** should be treated as a warning signal, not a success: it likely indicates a feature-selection issue and should be fixed in the next iteration (e.g., explicitly dropping identifier columns).
 
-### Artifacts
+## Outputs
 
-Running training generates:
+Running training saves:
 
 - `outputs/cv_result.json`
 - `outputs/feature_importance.csv`
 - `data/submissions/submission.csv`
-
-Pipeline order (important):
-
-1. Load train/test CSVs
-2. Add domain-driven features (`add_domain_features`)
-3. Split target (`SalePrice`) and apply `log1p`
-4. Run 5-fold CV for LightGBM, CatBoost, and their 50/50 ensemble
-5. Retrain both models on full training data
-6. Average test predictions, reverse target with `expm1`, and save artifacts
-
-## Results
-
-This project records fold-level and aggregate CV metrics in:
-
-- `outputs/cv_result.json`
-
-Example fields include:
-
-- `fold_rmse`
-- `mean_rmse`
-- `std_rmse`
-
-Feature importance rankings are exported to:
-
-- `outputs/feature_importance.csv`
 
 ## Repository Structure
 
 ```text
 kaggle-house-prices-portfolio/
 ├── data/
-│   ├── raw/                 # Kaggle train/test CSVs (not committed)
-│   └── submissions/         # Generated submission.csv
+│   ├── raw/                 # Kaggle CSVs (not committed)
+│   └── submissions/         # submission.csv
 ├── notebooks/
-│   └── train.ipynb          # Original notebook reference
-├── outputs/                 # CV + feature importance outputs
+│   └── train.ipynb          # original notebook reference
+├── outputs/
+├── reports/
+│   ├── summary.md
+│   └── interview_qa.md
 ├── scripts/
-│   └── run_train.py         # End-to-end training entrypoint
+│   └── run_train.py
 ├── src/
-│   ├── data.py              # Data loading and submission writing
-│   ├── evaluate.py          # Saving CV and feature importance artifacts
-│   ├── features.py          # Preprocessing pipeline
-│   └── train.py             # CV training + final fit
+│   ├── data.py
+│   ├── features.py
+│   ├── train.py
+│   └── evaluate.py
 ├── requirements.txt
 └── README.md
 ```
 
 ## How to Run
 
-1. Install dependencies:
+1. Install dependencies
 
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Download Kaggle data and place files in `data/raw/`:
+2. Put Kaggle files in `data/raw/`
 
    - `train.csv`
    - `test.csv`
 
-3. Train and generate outputs:
+3. Train and generate outputs
 
    ```bash
    python scripts/run_train.py
    ```
 
-4. Check generated files:
-
-   - `outputs/cv_result.json`
-   - `outputs/feature_importance.csv`
-   - `data/submissions/submission.csv`
-
 ## Lessons Learned
 
-- A strong baseline with clean structure is often more valuable for portfolios than a heavily tuned notebook.
-- Separating data, features, training, and evaluation logic improves readability and maintainability.
-- Reproducible outputs (metrics + artifacts) make experimentation and explanation much easier.
+- Clean modular design is valuable for portfolio clarity.
+- Small, explainable feature engineering can improve baseline quality.
+- CV mean + std gives better evidence than a single split.
+- Model complexity should be judged by measured results, not assumptions.
 
-## Limitations / Future Work
+## Next Steps
 
-- Minimal feature engineering by design; performance can improve with richer domain features.
-- No experiment tracking framework yet (e.g., MLflow/W&B).
-- Ensemble is intentionally simple (equal averaging); more complex methods are possible but intentionally out of scope.
-- Could add unit tests and CI checks for stronger engineering rigor.
-- Could add model persistence and inference script for deployment-style workflows.
+- Explicitly remove `Id` (and similar identifier leakage risks) from training features.
+- Continue limited, controlled tuning rather than broad brute-force search.
+- Add experiment tracking + simple tests/CI for stronger engineering quality.

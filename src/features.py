@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
@@ -8,6 +10,7 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 MISSING_CATEGORY_VALUE = "Missing"
+ID_COL = "Id"
 
 
 def _get_numeric_column(df: pd.DataFrame, col_name: str) -> pd.Series:
@@ -65,6 +68,53 @@ def add_domain_features(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[:, "OverallQual_x_GrLivArea"] = overall_qual * gr_liv_area
 
     return df
+
+
+def _is_near_constant(series: pd.Series, threshold: float) -> bool:
+    """Return True when a feature is constant or dominated by one value."""
+    counts = Counter(series.fillna("__MISSING__").tolist())
+    if not counts:
+        return True
+    most_common_ratio = counts.most_common(1)[0][1] / len(series)
+    return most_common_ratio >= threshold
+
+
+def cleanup_feature_columns(
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    remove_id: bool = True,
+    near_constant_threshold: float | None = 0.995,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Apply lightweight, interview-friendly feature cleanup.
+
+    Design choices:
+    - Always remove `Id` because it is an identifier, not a predictive signal.
+    - Optionally remove near-constant columns using train-only statistics.
+    """
+    X_train_clean = X_train.copy()
+    X_test_clean = X_test.copy()
+
+    dropped_cols: list[str] = []
+
+    if remove_id and ID_COL in X_train_clean.columns:
+        dropped_cols.append(ID_COL)
+
+    if near_constant_threshold is not None:
+        for col in X_train_clean.columns:
+            if _is_near_constant(X_train_clean[col], threshold=near_constant_threshold):
+                dropped_cols.append(col)
+
+    # Keep order stable and unique.
+    dropped_cols = list(dict.fromkeys(dropped_cols))
+
+    if dropped_cols:
+        X_train_clean = X_train_clean.drop(columns=dropped_cols, errors="ignore")
+        X_test_clean = X_test_clean.drop(columns=dropped_cols, errors="ignore")
+
+    # Ensure train/test stay aligned after cleanup.
+    X_test_clean = X_test_clean.reindex(columns=X_train_clean.columns)
+
+    return X_train_clean, X_test_clean, dropped_cols
 
 
 def build_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
