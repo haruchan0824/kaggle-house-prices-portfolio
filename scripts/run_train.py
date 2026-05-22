@@ -8,6 +8,8 @@ from src.data import load_train_test, save_submission, split_features_target
 from src.evaluate import save_cv_result, save_feature_importance, save_model_comparison
 from src.features import add_domain_features, cleanup_feature_columns
 from src.train import train_and_compare_models_with_cv
+import joblib
+
 
 
 def main() -> None:
@@ -69,6 +71,43 @@ def main() -> None:
     save_model_comparison(artifacts.comparison_df, "outputs/model_comparison.csv")
     save_feature_importance(artifacts.feature_importance, "outputs/feature_importance.csv")
 
+    # Save inference artifacts for FastAPI.
+    artifact_dir = Path("app/artifacts")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    recommended_model = {
+        "lightgbm": artifacts.lgbm_model,
+        "catboost": artifacts.catboost_model,
+        "simple_average_ensemble": None,
+        "weighted_ensemble_cb_0.70_lgbm_0.30": None,
+    }.get(artifacts.recommended_model_name)
+
+    if recommended_model is not None:
+        joblib.dump(recommended_model, artifact_dir / "model.pkl")
+    else:
+        # For ensemble inference, save both base models and the ensemble weights.
+        joblib.dump(
+            {
+                "lgbm_model": artifacts.lgbm_model,
+                "catboost_model": artifacts.catboost_model,
+                "weights": {
+                    "lgbm": 0.3,
+                    "catboost": 0.7,
+                },
+            },
+            artifact_dir / "model.pkl",
+        )
+
+    joblib.dump(X_train.columns.tolist(), artifact_dir / "feature_columns.pkl")
+    joblib.dump(dropped_cols, artifact_dir / "dropped_cols.pkl")
+    joblib.dump(artifacts.recommended_model_name, artifact_dir / "recommended_model_name.pkl")
+
+    print("Saved inference artifacts:")
+    print("- app/artifacts/model.pkl")
+    print("- app/artifacts/feature_columns.pkl")
+    print("- app/artifacts/dropped_cols.pkl")
+    print("- app/artifacts/recommended_model_name.pkl")
+
     print("Training complete.")
     print(f"Dropped columns: {dropped_cols}")
     print(f"Recommended final model: {artifacts.recommended_model_name}")
@@ -79,6 +118,8 @@ def main() -> None:
     print("Saved: outputs/cv_result.json")
     print("Saved: outputs/model_comparison.csv")
     print("Saved: outputs/feature_importance.csv")
+
+    
 
 
 if __name__ == "__main__":
