@@ -29,7 +29,7 @@
 
 **Q. どのモデルを使っていますか？**  
 **A.**
-- `LightGBMRegressor` と `CatBoostRegressor` の2モデルを学習し、最終予測は**単純平均（50/50）**にしています。
+- `LightGBMRegressor` と `CatBoostRegressor` を学習し、単体、単純平均（50/50）、重み付き平均（30/70）を比較します。
 - LightGBMは表形式の強いベースラインとして採用し、CatBoostは異なる学習バイアスで誤差の分散低減を狙っています。
 - ただし、stackingや複雑な重み最適化は入れず、説明しやすさを優先しました。
 
@@ -97,9 +97,9 @@
 
 **Q. 実行結果として何が残りますか？**  
 **A.**
-- `outputs/cv_result.json`：fold RMSE、平均、標準偏差（3系統）
+- `outputs/cv_result.json`：fold RMSE、平均、標準偏差（4候補）
 - `outputs/feature_importance.csv`：LightGBMの特徴量重要度
-- `data/submissions/submission.csv`：最終提出ファイル
+- `data/submissions/`：モデル別の提出ファイルとCV推奨モデルの提出ファイル
 
 この3点を固定出力にすることで、再実行時の比較と説明がしやすくなります。
 
@@ -121,7 +121,7 @@
 **A.**
 - 限界
   - 特徴量設計は小規模で、上位解法ほどの探索はしていません。
-  - アンサンブルは固定50/50で、重み最適化は未実施です。
+  - アンサンブル重みは説明しやすい固定値で、探索による最適化は未実施です。
 - 改善案
   1. ドメイン特徴の追加・整理
   2. 限定的なハイパーパラメータチューニング
@@ -131,4 +131,4 @@
 
 ## 12. 30秒で説明するなら？（テンプレ）
 
-「Kaggle House Pricesで、Tabular MLの再現可能なベースラインを実装しました。`log1p`、欠損補完、one-hot、5-fold CVをモジュール化し、LightGBMとCatBoostの単純平均でロバスト性を確保しています。`cv_result.json`・`feature_importance.csv`・`submission.csv`まで自動出力し、面接で設計意図とトレードオフを説明しやすい構成にしました。」
+「Kaggle House Pricesで、Tabular MLの再現可能なパイプラインを実装しました。`log1p`、欠損補完、one-hot、5-fold CVをモジュール化し、LightGBM、CatBoost、2種類の平均アンサンブルを比較します。CV結果・特徴量重要度・モデル別submission・API用artifactまで自動出力します。」

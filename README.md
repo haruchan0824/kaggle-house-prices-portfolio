@@ -1,143 +1,126 @@
-# Kaggle House Prices — Portfolio Pipeline (Entry-Level ML Engineer)
+# Kaggle House Prices Portfolio Pipeline
 
-A clean, interview-friendly tabular ML project based on the [Kaggle House Prices competition](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques).
+An interview-focused tabular regression project for the
+[Kaggle House Prices competition](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques).
+It demonstrates reproducible training, explainable feature engineering, model comparison,
+Kaggle submissions, and a containerized inference API.
 
-> **Project intent:** demonstrate reproducibility, explainability, and iterative improvement — not leaderboard chasing.
+## Problem and pipeline
 
-## Overview
-
-This repository shows a practical regression workflow for structured data:
-
-- clear preprocessing
-- modular training code
-- 5-fold cross-validation
-- artifact generation for reproducibility
-
-It is designed to be easy to explain in interviews for entry-level AI/ML/Data Engineer roles.
-
-## Problem
-
-- **Task:** predict `SalePrice` from tabular features
-- **Target transform:** `log1p(SalePrice)` during training, `expm1` at prediction output
-- **Validation metric:** RMSE on log-transformed target
-
-## Iterative Project Flow
-
-This project is structured as an iterative pipeline:
-
-1. **Baseline:** LightGBM with simple, robust preprocessing
-2. **Feature engineering:** add small domain-driven features that are easy to explain
-3. **Lightweight tuning:** limited Optuna search for key hyperparameters only
-4. **Simple ensemble:** LightGBM + CatBoost 50/50 average (no stacking)
-
-Important: more complexity did **not** automatically produce the best model in this project.
-
-## Models
-
-- LightGBM Regressor (`LGBMRegressor`)
-- CatBoost Regressor (`CatBoostRegressor`)
-- Simple average ensemble (`0.5 * LightGBM + 0.5 * CatBoost`)
-
-## Preprocessing
-
-- Numeric: median imputation
-- Categorical: fill missing with `"Missing"`
-- Encoding: one-hot encoding (`handle_unknown="ignore"`)
-- Target: `log1p(SalePrice)`
-
-## Added Domain Features
-
-- `TotalSF = TotalBsmtSF + 1stFlrSF + 2ndFlrSF`
-- `HouseAge = YrSold - YearBuilt`
-- `RemodAge = YrSold - YearRemodAdd`
-- `TotalBath = FullBath + 0.5 * HalfBath + BsmtFullBath + 0.5 * BsmtHalfBath`
-- `HasGarage = (GarageArea > 0)`
-- `HasBsmt = (TotalBsmtSF > 0)`
-- `HasFireplace = (Fireplaces > 0)`
-- `OverallQual_x_GrLivArea = OverallQual * GrLivArea`
-
-These features were chosen because they are intuitive (size, age, remodeling, amenities, quality-area interaction) and easy to justify in interviews.
-
-## Results (5-fold CV)
-
-| Model | Mean RMSE | Std RMSE |
-|---|---:|---:|
-| LightGBM | 0.13323640336408846 | 0.01783933807588219 |
-| CatBoost | **0.12380264917734725** | 0.017687264357621062 |
-| Ensemble (LGBM + CatBoost average) | 0.12537854076497493 | 0.018206999267681857 |
-
-### Interpretation
-
-- **CatBoost was the best-performing model** in this run.
-- The simple ensemble improved over **LightGBM alone**, but **did not beat CatBoost**.
-- This is a useful portfolio lesson: a more complex setup is not always the top performer.
-
-## Feature Importance Note
-
-Engineered features such as `OverallQual_x_GrLivArea` and `TotalSF` appear useful in importance analysis.
-
-At the same time, high importance for **`Id`** should be treated as a warning signal, not a success: it likely indicates a feature-selection issue and should be fixed in the next iteration (e.g., explicitly dropping identifier columns).
-
-## Outputs
-
-Running training saves:
-
-- `outputs/cv_result.json`
-- `outputs/feature_importance.csv`
-- `data/submissions/submission.csv`
-
-## Repository Structure
+The task is to predict `SalePrice`. Training uses `log1p(SalePrice)` and evaluates
+5-fold cross-validation RMSE on that log target; submissions and API responses use
+`expm1` to return prices. The pipeline is:
 
 ```text
-kaggle-house-prices-portfolio/
-├── data/
-│   ├── raw/                 # Kaggle CSVs (not committed)
-│   └── submissions/         # submission.csv
-├── notebooks/
-│   └── train.ipynb          # original notebook reference
-├── outputs/
-├── reports/
-│   ├── summary.md
-│   └── interview_qa.md
-├── scripts/
-│   └── run_train.py
-├── src/
-│   ├── data.py
-│   ├── features.py
-│   ├── train.py
-│   └── evaluate.py
-├── requirements.txt
-└── README.md
+Kaggle CSVs -> domain features -> train-only cleanup -> imputation/one-hot encoding
+            -> LightGBM + CatBoost -> CV comparison -> submissions + API artifact
 ```
 
-## How to Run
+`SalePrice` and identifier `Id` are excluded from model features. Near-constant
+columns are selected from training statistics only, then the same retained schema is
+applied to test and inference data.
 
-1. Install dependencies
+## Feature engineering
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+The shared feature function creates `TotalSF`, `HouseAge`, `RemodAge`, `TotalBath`,
+`HasGarage`, `HasBsmt`, `HasFireplace`, and `OverallQual_x_GrLivArea`. These encode
+size, age, remodeling, amenities, and a quality/area interaction without opaque methods.
 
-2. Put Kaggle files in `data/raw/`
+## Models and results
 
-   - `train.csv`
-   - `test.csv`
+Training compares LightGBM, CatBoost, a 50/50 simple average, and a 70% CatBoost /
+30% LightGBM weighted average. The model with the lowest mean local CV RMSE is the
+recommendation; an ensemble is not forced to win.
 
-3. Train and generate outputs
+Previously recorded 5-fold results were:
 
-   ```bash
-   python scripts/run_train.py
-   ```
+| Model | Mean log-RMSE | Std |
+|---|---:|---:|
+| LightGBM | 0.13305 | 0.01931 |
+| CatBoost | **0.12371** | 0.01778 |
+| 50/50 ensemble | 0.12516 | 0.01881 |
+| 70% CatBoost / 30% LightGBM | 0.12377 | 0.01848 |
 
-## Lessons Learned
+CatBoost was strongest in the verified local CV run. Local CV remains the primary selection
+criterion. No verifiable Kaggle Public Score record is committed, so this repository
+does not claim a leaderboard result.
 
-- Clean modular design is valuable for portfolio clarity.
-- Small, explainable feature engineering can improve baseline quality.
-- CV mean + std gives better evidence than a single split.
-- Model complexity should be judged by measured results, not assumptions.
+## Reproduce training
 
-## Next Steps
+Use Python 3.11 or 3.12. Kaggle data is intentionally not distributed in this repository.
 
-- Explicitly remove `Id` (and similar identifier leakage risks) from training features.
-- Continue limited, controlled tuning rather than broad brute-force search.
-- Add experiment tracking + simple tests/CI for stronger engineering quality.
+```bash
+python -m venv .venv
+pip install -r requirements.txt
+# Place train.csv and test.csv under data/raw/
+python -m scripts.run_train
+```
+
+Training writes CV and importance files under `outputs/`, four directly submittable
+files under `data/submissions/`, and `artifacts/model.joblib` for inference:
+
+- `submission_lgbm.csv`
+- `submission_catboost.csv`
+- `submission_simple_ensemble.csv`
+- `submission_weighted_ensemble.csv`
+
+Generated data, outputs, and model artifacts are ignored by Git.
+
+## Inference API
+
+After training:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"OverallQual":7,"GrLivArea":1500,"YearBuilt":2005,"YrSold":2010}'
+```
+
+`GET /health` reports model availability. `POST /predict` accepts one JSON object of
+House Prices fields and returns a numeric USD prediction. A missing artifact produces
+a clear `503` response.
+
+## Docker and AWS
+
+Build only after training so the model is embedded in the image:
+
+```bash
+docker build -t house-prices-api .
+docker run --rm -p 8000:8000 house-prices-api
+```
+
+The image listens on `0.0.0.0` and honors `PORT`. AWS deployment is **prepared, not
+completed**. The minimal target is ECR -> ECS/Fargate, with an optional ALB. See
+[the AWS deployment runbook](docs/aws_deployment.md).
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+The smoke suite checks features and schema cleanup, submission validity, and API
+health/prediction behavior.
+
+## Repository structure
+
+```text
+app/          FastAPI entrypoint
+artifacts/    locally generated inference model
+docs/         AWS runbook and interview material
+notebooks/    historical notebook reference (not authoritative)
+scripts/      training entrypoint
+src/          data, features, evaluation, and model training
+tests/        focused smoke tests
+```
+
+## Limitations and future work
+
+- Re-run training to reproduce the committed historical scores and generate the API artifact.
+- Deploy the verified image manually to ECR/ECS and record the endpoint evidence.
+- The API intentionally accepts the competition's sparse raw feature shape; production
+  use would require a stricter versioned request contract and monitoring.
+- The notebook is retained as project history; `python -m scripts.run_train` is authoritative.
