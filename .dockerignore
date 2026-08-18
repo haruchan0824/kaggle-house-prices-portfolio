@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+data
+notebooks
+outputs
+reports
+tests
+catboost_info
+*.log
+.env*
