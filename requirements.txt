@@ -3,3 +3,6 @@ numpy
 scikit-learn
 lightgbm
 catboost
+joblib
+fastapi
+uvicorn[standard]
