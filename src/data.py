@@ -14,14 +14,22 @@ ID_COL = "Id"
 def load_train_test(data_dir: str | Path = "data/raw") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Load Kaggle House Prices train/test CSVs."""
     data_dir = Path(data_dir)
-    train_df = pd.read_csv(data_dir / "train.csv")
-    test_df = pd.read_csv(data_dir / "test.csv")
+    train_path = data_dir / "train.csv"
+    test_path = data_dir / "test.csv"
+    missing = [str(path) for path in (train_path, test_path) if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Missing Kaggle data file(s): " + ", ".join(missing)
+            + ". Download the competition data and place both CSVs under data/raw/."
+        )
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
     return train_df, test_df
 
 
 def split_features_target(train_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
     """Split training data into features and target."""
-    X = train_df.drop(columns=[TARGET_COL])
+    X = train_df.drop(columns=[TARGET_COL, ID_COL], errors="ignore")
     y = train_df[TARGET_COL]
     return X, y
 

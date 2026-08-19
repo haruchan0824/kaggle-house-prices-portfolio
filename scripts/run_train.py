@@ -7,7 +7,7 @@ import numpy as np
 from src.data import load_train_test, save_submission, split_features_target
 from src.evaluate import save_cv_result, save_feature_importance, save_model_comparison
 from src.features import add_domain_features, cleanup_feature_columns
-from src.train import train_and_compare_models_with_cv
+from src.train import save_inference_artifact, train_and_compare_models_with_cv
 
 
 def main() -> None:
@@ -46,8 +46,8 @@ def main() -> None:
     submission_paths = {
         "lightgbm": Path("data/submissions/submission_lgbm.csv"),
         "catboost": Path("data/submissions/submission_catboost.csv"),
-        "simple_average_ensemble": Path("data/submissions/submission_ensemble.csv"),
-        "weighted_ensemble_cb_0.70_lgbm_0.30": Path("data/submissions/submission_weighted.csv"),
+        "simple_average_ensemble": Path("data/submissions/submission_simple_ensemble.csv"),
+        "weighted_ensemble_cb_0.70_lgbm_0.30": Path("data/submissions/submission_weighted_ensemble.csv"),
     }
 
     prediction_map = {
@@ -68,6 +68,7 @@ def main() -> None:
     save_cv_result(artifacts.cv_result, "outputs/cv_result.json")
     save_model_comparison(artifacts.comparison_df, "outputs/model_comparison.csv")
     save_feature_importance(artifacts.feature_importance, "outputs/feature_importance.csv")
+    save_inference_artifact(artifacts, X_train.columns.tolist())
 
     print("Training complete.")
     print(f"Dropped columns: {dropped_cols}")
@@ -79,6 +80,7 @@ def main() -> None:
     print("Saved: outputs/cv_result.json")
     print("Saved: outputs/model_comparison.csv")
     print("Saved: outputs/feature_importance.csv")
+    print("Saved: artifacts/model.joblib")
 
 
 if __name__ == "__main__":

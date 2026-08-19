@@ -35,8 +35,8 @@
 
 1. **Baseline**: LightGBM でまず動く基準線を作る
 2. **Feature Engineering**: 直感的なドメイン特徴量を追加
-3. **Lightweight Tuning**: Optuna で主要パラメータのみ限定探索
-4. **Simple Ensemble**: LightGBM + CatBoost を単純平均
+3. **Model Comparison**: LightGBM と CatBoost を同一CVで比較
+4. **Ensemble Comparison**: 単純平均と重み付き平均を比較
 
 この順序にした理由は、改善要因を分解して説明しやすくするためです。
 
@@ -101,12 +101,14 @@
 
 ## 8. 実測結果（5-fold CV）
 
-- LightGBM mean RMSE: `0.13323640336408846`
-- LightGBM std RMSE: `0.01783933807588219`
-- CatBoost mean RMSE: `0.12380264917734725`
-- CatBoost std RMSE: `0.017687264357621062`
-- Ensemble mean RMSE: `0.12537854076497493`
-- Ensemble std RMSE: `0.018206999267681857`
+- LightGBM mean RMSE: `0.13305448599398387`
+- LightGBM std RMSE: `0.01930710379574663`
+- CatBoost mean RMSE: `0.12370907584532861`
+- CatBoost std RMSE: `0.017777114491833643`
+- Simple ensemble mean RMSE: `0.1251627864418931`
+- Simple ensemble std RMSE: `0.01880868486657056`
+- Weighted ensemble mean RMSE: `0.1237717374788283`
+- Weighted ensemble std RMSE: `0.01847609993705943`
 
 ### 結果の解釈
 
@@ -160,7 +162,7 @@
 
 1. 学習特徴から `Id` を明示的に除外
 2. 特徴量選択ルールを明文化（漏洩・識別子を除外）
-3. Optuna の探索範囲を限定したまま、再現可能な比較を継続
+3. 同じCV分割で再現可能なモデル比較を継続
 4. 実験管理（MLflow等）で比較履歴を整理
 5. 簡単なテスト/CIを導入して品質担保
 

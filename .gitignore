@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.pyc
+.pytest_cache/
+.venv/
 
 # Data
 data/
@@ -11,6 +13,18 @@ data/
 
 # Outputs
 outputs/
+catboost_info/
+*.log
+
+# Local secrets and cloud credentials
+.env
+.env.*
+.aws/
+credentials
+
+# Generated model artifacts (copy into an image only after training)
+artifacts/*.joblib
+!artifacts/.gitkeep
 
 # OS
 .DS_Store

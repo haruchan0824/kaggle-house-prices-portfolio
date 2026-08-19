@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+import joblib
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.metrics import mean_squared_error
@@ -29,6 +30,7 @@ BASE_CATBOOST_PARAMS = {
     "loss_function": "RMSE",
     "random_seed": 42,
     "verbose": 0,
+    "allow_writing_files": False,
 }
 
 
@@ -40,6 +42,34 @@ class TrainingArtifacts:
     comparison_df: pd.DataFrame
     feature_importance: pd.DataFrame
     recommended_model_name: str
+
+
+def save_inference_artifact(
+    artifacts: TrainingArtifacts,
+    feature_columns: list[str],
+    output_path: str = "artifacts/model.joblib",
+) -> None:
+    """Persist fitted pipelines and their input schema for API inference."""
+    from pathlib import Path
+
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(
+        {
+            "artifact_version": 1,
+            "feature_columns": feature_columns,
+            "recommended_model_name": artifacts.recommended_model_name,
+            "models": {
+                "lightgbm": artifacts.lgbm_model,
+                "catboost": artifacts.catboost_model,
+            },
+            "ensemble_weights": {
+                "simple_average_ensemble": {"lightgbm": 0.5, "catboost": 0.5},
+                "weighted_ensemble_cb_0.70_lgbm_0.30": {"lightgbm": 0.3, "catboost": 0.7},
+            },
+        },
+        path,
+    )
 
 
 def _build_lgbm_model(random_state: int = 42) -> LGBMRegressor:
@@ -88,8 +118,7 @@ def train_and_compare_models_with_cv(
 
     Design choices kept intentionally simple for portfolio explainability:
     - Same preprocessing and CV splits for all candidates.
-    - Weighted ensemble is only kept as a valid candidate if it beats CatBoost.
-    - Final recommendation is data-driven (best mean CV RMSE among valid candidates).
+    - Final recommendation is data-driven (best mean CV RMSE across all candidates).
     """
     if not 0.0 < catboost_weight < 1.0:
         raise ValueError("catboost_weight must be between 0 and 1")
@@ -142,14 +171,7 @@ def train_and_compare_models_with_cv(
         weighted_model_name: _build_cv_model_stats(fold_rmse_weighted_ensemble),
     }
 
-    # Keep weighted candidate only when it improves over CatBoost.
-    include_weighted_candidate = (
-        models[weighted_model_name]["mean_rmse"] < models["catboost"]["mean_rmse"]
-    )
-
-    candidate_names = ["lightgbm", "catboost", "simple_average_ensemble"]
-    if include_weighted_candidate:
-        candidate_names.append(weighted_model_name)
+    candidate_names = list(models)
 
     recommended_model_name = min(candidate_names, key=lambda name: models[name]["mean_rmse"])
 
@@ -191,15 +213,13 @@ def train_and_compare_models_with_cv(
         "weighted_ensemble": {
             "catboost_weight": catboost_weight,
             "lightgbm_weight": lgbm_weight,
-            "included_as_candidate": include_weighted_candidate,
-            "inclusion_rule": "include only if weighted mean RMSE < CatBoost mean RMSE",
+            "included_as_candidate": True,
         },
         "models": models,
         "candidate_models": candidate_names,
         "recommended_final_model": recommended_model_name,
         "recommendation_reason": (
-            "lowest mean CV RMSE among valid candidates; "
-            "weighted ensemble kept only when it beats CatBoost"
+            "lowest mean CV RMSE across the compared candidates"
         ),
     }
 
